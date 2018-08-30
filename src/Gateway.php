@@ -1,7 +1,10 @@
 <?php
+
 namespace Omnipay\PaywayRest;
 
 use Omnipay\Common\AbstractGateway;
+use SilverStripe\Core\Injector\Injector;
+use Psr\Log\LoggerInterface;
 
 /**
  * PayWay Credit Card gateway
@@ -18,7 +21,7 @@ class Gateway extends AbstractGateway
         return array(
             'apiKeyPublic' => '',
             'apiKeySecret' => '',
-            'merchantId'   => '',
+            'merchantId' => '',
             'useSecretKey' => false,
         );
     }
@@ -79,7 +82,7 @@ class Gateway extends AbstractGateway
 
     /**
      * Test the PayWay gateway
-     * @param  array  $parameters Request parameters
+     * @param  array $parameters Request parameters
      * @return \Omnipay\PaywayRest\Message\CheckNetworkRequest
      */
     public function testGateway(array $parameters = array())
@@ -155,7 +158,7 @@ class Gateway extends AbstractGateway
 
     /**
      * Get Customer details
-     * @param  array  $parameters
+     * @param  array $parameters
      * @return \Omnipay\PaywayRest\Message\CustomerDetailRequest
      */
     public function getCustomerDetails(array $parameters = array())
@@ -166,13 +169,12 @@ class Gateway extends AbstractGateway
 
     /**
      * Get Transaction details
-     * @param  array  $parameters
+     * @param  array $parameters
      * @return \Omnipay\PaywayRest\Message\TransactionDetailRequest
      */
     public function getTransactionDetails(array $parameters = array())
     {
         return $this->createRequest('\Omnipay\PaywayRest\Message\TransactionDetailRequest', $parameters);
-
     }
 
     /**
@@ -194,4 +196,44 @@ class Gateway extends AbstractGateway
     {
         return $this->createRequest('\Omnipay\PaywayRest\Message\BankAccountListRequest', $parameters);
     }
+
+    /**
+     * Get List of Transactions by receiptNumber (stored in OmniPay as transactionReference)
+     * @param array $parameters
+     * @return \Omnipay\PaywayRest\Message\TransactionsRequest
+     */
+    public function getTransactions(array $parameters = array())
+    {
+        return $this->createRequest('\Omnipay\PaywayRest\Message\TransactionsRequest', $parameters);
+    }
+
+    /**
+     * Refund request
+     * @param array $parameters
+     * @return \Omnipay\PaywayRest\Message\RefundRequest
+     */
+    public function refund(array $parameters = array())
+    {
+        // note that transactionReference is not reliable, so we do an extra lookup.
+        $refundParams = [
+            'principalAmount' => $parameters['amount'],
+            'parentTransactionId' => $parameters['transactionReference']
+        ];
+
+        $transactions = $this->getTransactions($parameters);
+        $response = $transactions->send();
+        $data = $response->getData('data');
+        if ($data && isset($data[0]) && isset($data[0]['transactionId'])) {
+            $refundParams['parentTransactionId'] = $data[0]['transactionId'];
+        }
+        // note that transaction might not be refundable, so we do an extra lookup.
+//            $transaction = $this->getTransactionDetails(['transactionId' => $data[0]['transactionId']]);
+//            $response = $transaction->send();
+//            $canRefund = $response->getData('isRefundable');
+//            if ($canRefund) {
+        return $this->createRequest('\Omnipay\PaywayRest\Message\RefundRequest', $refundParams);
+//            }
+
+    }
+
 }
