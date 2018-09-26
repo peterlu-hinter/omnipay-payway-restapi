@@ -5,6 +5,7 @@ namespace Omnipay\PaywayRest;
 use Omnipay\Common\AbstractGateway;
 use SilverStripe\Core\Injector\Injector;
 use Psr\Log\LoggerInterface;
+use SilverStripe\Dev\Debug;
 
 /**
  * PayWay Credit Card gateway
@@ -208,7 +209,7 @@ class Gateway extends AbstractGateway
     }
 
     /**
-     * Refund request
+     * Refund (or Void) request
      * @param array $parameters
      * @return \Omnipay\PaywayRest\Message\RefundRequest
      */
@@ -219,20 +220,25 @@ class Gateway extends AbstractGateway
             'principalAmount' => $parameters['amount'],
             'parentTransactionId' => $parameters['transactionReference']
         ];
-
+        $voidParams = [];
         $transactions = $this->getTransactions($parameters);
         $response = $transactions->send();
         $data = $response->getData('data');
         if ($data && isset($data[0]) && isset($data[0]['transactionId'])) {
             $refundParams['parentTransactionId'] = $data[0]['transactionId'];
+            $voidParams['transactionId'] = $data[0]['transactionId'];
+
         }
-        // note that transaction might not be refundable, so we do an extra lookup.
-//            $transaction = $this->getTransactionDetails(['transactionId' => $data[0]['transactionId']]);
-//            $response = $transaction->send();
-//            $canRefund = $response->getData('isRefundable');
-//            if ($canRefund) {
-        return $this->createRequest('\Omnipay\PaywayRest\Message\RefundRequest', $refundParams);
-//            }
+//         note that transaction might not be refundable, so we do an extra lookup.
+        $transaction = $this->getTransactionDetails(['transactionId' => $data[0]['transactionId']]);
+        $response = $transaction->send();
+        $canRefund = $response->getData('isRefundable');
+        $canVoid = $response->getData('isVoidable');
+        if ($canRefund) {
+            return $this->createRequest('\Omnipay\PaywayRest\Message\RefundRequest', $refundParams);
+        } elseif ($canVoid) {
+            return $this->createRequest('\Omnipay\PaywayRest\Message\VoidRequest', $voidParams);
+        }
 
     }
 
