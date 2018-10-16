@@ -91,6 +91,15 @@ class Response extends AbstractResponse
     }
 
     /**
+     * Get Transaction settlement date
+     * @return string Payway settlementDate
+     */
+    public function getSettlementDate()
+    {
+        return $this->getData('settlementDate');
+    }
+
+    /**
      * Get Customer Number
      * @return string|null
      */
